@@ -1,0 +1,19 @@
+#ifndef FACE_H
+#define FACE_H
+
+#include <map>
+#include <vector>
+#include "TextureSource.h"
+#include "Texture.h"
+
+class Face : public TextureSource {
+private:
+    std::map<std::string, Texture> textures;
+
+public:
+    void Loop() override;
+    void Init() override;
+    Texture GetTexture() override;
+};
+
+#endif
