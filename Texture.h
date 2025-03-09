@@ -6,9 +6,12 @@
 
 class Texture {
 public:
-    std::vector<std::vector<int>> textureMap; // int is on/off 0-255
+    std::vector<std::vector<double>> textureMap; // 0-1
+    std::vector<std::vector<double>> textureMap_Open; // 0-1
     Texture() = default;
-    Texture(const std::string& path);
+    Texture(const std::string& path, const std::string& file);
+private:
+    void loadTexture(const std::string& filePath, std::vector<std::vector<double>>& textureMap);
 };
 
 #endif // TEXTURE_H

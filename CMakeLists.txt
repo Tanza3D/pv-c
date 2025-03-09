@@ -14,6 +14,7 @@ set(SOURCE_FILES
         Face.cpp
         TextureSource.cpp
         Texture.cpp
+        stb_image.h
         matrix/canvas.h
         matrix/content-streamer.h
         matrix/graphics.h

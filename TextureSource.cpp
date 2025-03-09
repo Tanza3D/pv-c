@@ -1,6 +1,6 @@
 #include "TextureSource.h"
 
-void Init() {
+void TextureSource::Init() {
 
 }
 TextureSource::TextureSource() {

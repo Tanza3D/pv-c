@@ -5,9 +5,9 @@
 
 class TextureSource {
 public:
-    virtual void Loop();
-    virtual void Init();
-    virtual Texture GetTexture();
+    virtual void Loop() = 0;
+    virtual void Init() = 0;
+    virtual Texture GetTexture() = 0;
 
     TextureSource();
 };
