@@ -8,6 +8,13 @@
 #include "Texture.h"
 #include "Eyes.h"
 #include "Face.h"
+#include <fstream>
+#include <fcntl.h>   
+#include <unistd.h> 
+#include <cstring> 
+#include <errno.h>  
+
+
 
 using namespace rgb_matrix;
 using namespace std;
@@ -136,8 +143,16 @@ int main() {
 
     RGBMatrix *matrix = RGBMatrix::CreateFromOptions(defaults, runtime);
     if (!matrix) {
-        cerr << "Could not create LED matrix" << endl;
+        std::cerr << "Could not create LED matrix" << std::endl;
         return 1;
+    }
+
+    // Fill the screen with red
+    for (size_t y = 0; y < 32; y++) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        for (size_t x = 0; x < 128; x++) {
+            matrix->SetPixel(x, y, y*6, 0, x*3);
+        }
     }
 
     vector <vector<TZColor>> gradientMap = {
@@ -150,39 +165,87 @@ int main() {
     Face face = Face();
     eyes.Init();
     face.Init();
-    cout << "Eyes texture size: " << eyes.GetTexture().textureMap.size() << "x"
-         << eyes.GetTexture().textureMap[0].size() << endl;
+    std::cout << "Eyes texture size: " << eyes.GetTexture().textureMap.size() << "x"
+         << eyes.GetTexture().textureMap[0].size() << std::endl;
 
     FrameCanvas *canvas = matrix->CreateFrameCanvas();
 
     float time = 0;
 
-    while (true) {
-        auto start = chrono::high_resolution_clock::now();
+    // Serial port initialization
+    const char* serialPort = "/dev/ttyACM0";
+    int serial_fd = open(serialPort, O_WRONLY | O_NOCTTY);  // Open the serial port
+    if (serial_fd == -1) {
+        std::cerr << "Error: Could not open serial port: " << strerror(errno) << std::endl;
+        //return 1;
+    }
 
+    std::string last_message = "";
+
+    int frameCount = 0;
+    auto lastTime = std::chrono::high_resolution_clock::now();
+    double fps = 0;
+    while (true) {
+        auto start = std::chrono::high_resolution_clock::now();
+
+        // Your existing code for drawing the screen, etc.
         drawScreen(canvas, eyes.GetTexture().textureMap, eyes.GetTexture().textureMap_Open,
                    face.GetTexture().textureMap, preprocessedGradient, time);
 
         canvas = matrix->SwapOnVSync(canvas);
 
-        auto end = chrono::high_resolution_clock::now();
-        chrono::duration<double, milli> duration = end - start;
-        //cout << "drawScreen took " << duration.count() << "ms" << endl;
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double, std::milli> duration = end - start;
+
         time += (duration.count() / 50);
 
-        // let's go as fast as we can we can :)
-        // this reduces flickers,
-        // but the flickers might also just be
-        // from process usage atm (clion etc)
-        // so it's worth checking later to see
-        // if we can add a frame limiter for my
-        // battery's sake (and probably heat too)
+        frameCount++;
 
+        // Calculate FPS every second
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsedTime = currentTime - lastTime;
+        
+        if (elapsedTime.count() >= 1.0) {  // If 1 second has passed
+            fps = frameCount / elapsedTime.count();
+            std::cout << "FPS: " << fps << std::endl;
 
+            // Reset for the next second
+            lastTime = currentTime;
+            frameCount = 0;
+        }
 
-        // :/
+        if (time > 60) {
+            time = 0;
+            std::string face_part = "F: " + face.texture;
+        
+            // Convert FPS to an integer and then to a string
+            int fps_int = static_cast<int>(fps);
+            std::string fps_str = std::to_string(fps_int);
+        
+            // Calculate the number of spaces needed to align FPS to the right within the first 16 characters
+            int spaces_needed = 16 - (face_part.size() + fps_str.size() + 1);  // +1 for the space before FPS
+            while (spaces_needed > 0) {
+                face_part += " ";  // Add spaces to the end of face_part
+                spaces_needed--;
+            }
+        
+            // Append FPS value
+            face_part += " " + fps_str;
+        
+            std::string eyes_part = "E: " + eyes.texture;
+            
+            // Check if there are any remaining characters for the second row
+            //std::string message = face_part + eyes_part;
+            //if (last_message != message) {
+            //    last_message = message;
+            //    ssize_t bytes_written = write(serial_fd, message.c_str(), message.size());
+            //}
+        }
+        
     }
 
+    // Clean up
+    close(serial_fd);
     delete matrix;
     return 0;
 }

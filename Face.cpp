@@ -7,12 +7,12 @@ void Face::Loop() {
 }
 
 void Face::Init() {
-    std::cout << "good morning?" << std::endl;
+    texture = "happy";
     textures["neutral"] = Texture("tex/face", "neutral");
     textures["happy"] = Texture("tex/face", "happy");
     textures["sad"] = Texture("tex/face", "sad");
 }
 
 Texture Face::GetTexture() {
-    return (textures.find("neutral")->second);
+    return (textures.find(texture)->second);
 }

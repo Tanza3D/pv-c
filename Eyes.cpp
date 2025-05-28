@@ -7,9 +7,10 @@ void Eyes::Loop() {
 }
 
 void Eyes::Init() {
+    texture = "neutral";
     textures["neutral"] = Texture("tex/eyes", "neutral");
 }
 
 Texture Eyes::GetTexture() {
-    return (textures.find("neutral")->second);
+    return (textures.find(texture)->second);
 }

@@ -11,6 +11,7 @@ private:
     std::map<std::string, Texture> textures;
 
 public:
+std::string texture;
     void Loop() override;
     void Init() override;
     Texture GetTexture() override;
