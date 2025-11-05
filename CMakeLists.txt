@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 project(pv-c)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 20)
 
 # Add the matrix directory as an include directory
 include_directories(matrix)

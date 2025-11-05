@@ -13,26 +13,83 @@
 #include <unistd.h> 
 #include <cstring> 
 #include <errno.h>  
+#include <iomanip>
+#include "base64.hpp"
+#include <thread>
+#include <mutex>
+#include <queue>
+#include <condition_variable>
+
+void printBitmapData(const std::string& bitmap_data, int width, int height) {
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int index = y * width + x;
+            // Print '1' as a filled square and '0' as an empty square
+            if (bitmap_data[index] == '1') {
+                std::cout << "\u2588\u2588"; // Full block
+            } else {
+                std::cout << "  "; // Empty space
+            }
+        }
+        std::cout << std::endl;
+    }
+}
 
 
 
 using namespace rgb_matrix;
 using namespace std;
 
-void setPixel(FrameCanvas *canvas, int x, int y, float alpha, const vector <vector<TZColor>> &gradient, int mirror = 1, bool eyes = false) {
+#define BIT_WIDTH 64
+#define BIT_HEIGHT 32
+uint8_t bit_buffer[BIT_WIDTH * BIT_HEIGHT / 8] = {0}; 
+
+
+void setBit(int i, bool value) {
+  if (value)
+    bit_buffer[i / 8] |= (1 << (i % 8));
+  else
+    bit_buffer[i / 8] &= ~(1 << (i % 8));
+}
+
+bool getBit(int i) {
+  return (bit_buffer[i / 8] >> (i % 8)) & 1;
+}
+
+
+void setPixel(FrameCanvas *canvas, int x, int y, float alpha, const vector<vector<TZColor>> &gradient, int mirror = 1, bool eyes = false) {
     if (!(alpha > 0)) return;
+    int orig_y = y;
     y = 32 - y;
     TZColor col = gradient[y][x];
 
-    if(eyes) {
+    if (eyes) {
         col.r = 100;
         col.g = 30;
         col.b = 255;
-
     }
 
-    if(mirror < 2) canvas->SetPixel(x, y, col.r * alpha, col.g * alpha, col.b * alpha);
-    if(mirror > 0) canvas->SetPixel(128 - x, y, col.r * alpha, col.g * alpha, col.b * alpha);
+    if (mirror < 2) canvas->SetPixel(x, y, col.r * alpha, col.g * alpha, col.b * alpha);
+    if (mirror > 0) canvas->SetPixel(128 - x, y, col.r * alpha, col.g * alpha, col.b * alpha);
+
+    int bit_index = orig_y * BIT_WIDTH + x;
+
+    // calculate brightness (simple luminance formula)
+    float brightness = 0.299f * col.r + 0.587f * col.g + 0.114f * col.b;
+    bool bit_value = (alpha > 0.5f) && (brightness > 10); // threshold brightness (10 is example)
+
+    if (mirror > 0) {
+        setBit(bit_index, bit_value);
+    }
+}
+
+std::string getBitmapData() {
+ std::string result;
+  result.reserve(BIT_WIDTH * BIT_HEIGHT);
+  for (int i = 0; i < BIT_WIDTH * BIT_HEIGHT; i++) {
+    result += getBit(i) ? '1' : '0';
+  }
+  return result;
 }
 
 void drawImage(FrameCanvas *canvas, const vector <vector<double>> &image, const vector <vector<TZColor>> &gradient) {
@@ -73,6 +130,7 @@ void drawPupil(FrameCanvas *canvas, const vector <vector<TZColor>> &gradient, co
 
     pupilX = std::min(std::max(pupilX, eyeMinX + 1), eyeMaxX - 1);
     pupilY = std::min(std::max(pupilY, eyeMinY + 1), eyeMaxY - 1);
+    
 
     int width = 3;
     int height = 7;
@@ -129,30 +187,80 @@ void drawScreen(FrameCanvas *canvas, const vector <vector<double>> eyes, const v
     drawImage(canvas, face, gradient);
 }
 
+
+std::mutex send_mutex;
+
+void send_in_chunks(int serial_fd, const std::string &message, size_t chunk_size = 200) {
+    std::thread([serial_fd, message, chunk_size]() {
+        std::lock_guard<std::mutex> lock(send_mutex);
+
+        size_t len = message.size();
+        size_t pos = 0;
+        while (pos < len) {
+            size_t send_len = std::min(chunk_size, len - pos);
+            size_t sent = 0;
+            while (sent < send_len) {
+                ssize_t ret = write(serial_fd, message.c_str() + pos + sent, send_len - sent);
+                if (ret <= 0) {
+                    // handle error or break
+                    break;
+                }
+                sent += ret;
+            }
+            pos += send_len;
+            usleep(25000); // 20ms
+        }
+    }).detach();
+}
+
+
+std::string packBitmap(const std::string& bits) {
+    std::string packed;
+    for (size_t i = 0; i < bits.size(); i += 8) {
+        std::string byte_str = bits.substr(i, 8);
+        while (byte_str.size() < 8) byte_str += '0'; // pad if needed
+        unsigned char byte = std::stoi(byte_str, nullptr, 2);
+        packed += byte;
+    }
+    return packed;
+}
+
+std::string base64_encode(const std::string &in) {
+    static const std::string b64_chars =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    
+    std::string out;
+    int val = 0, valb = -6;
+    for (unsigned char c : in) {
+        val = (val << 8) + c;
+        valb += 8;
+        while (valb >= 0) {
+            out.push_back(b64_chars[(val >> valb) & 0x3F]);
+            valb -= 6;
+        }
+    }
+    if (valb > -6)
+        out.push_back(b64_chars[((val << 8) >> (valb + 8)) & 0x3F]);
+    while (out.size() % 4) out.push_back('=');
+    return out;
+}
+
 int main() {
     RGBMatrix::Options defaults;
     defaults.rows = 32;
     defaults.cols = 64;
     defaults.chain_length = 2;
     defaults.hardware_mapping = "adafruit-hat";
-    defaults.brightness = 100;
 
     RuntimeOptions runtime;
-    runtime.drop_privileges = 0;
-    runtime.gpio_slowdown = 4;
+    runtime.gpio_slowdown = 2;
+    defaults.brightness = 100;
+    defaults.limit_refresh_rate_hz = 90;
 
     RGBMatrix *matrix = RGBMatrix::CreateFromOptions(defaults, runtime);
     if (!matrix) {
         std::cerr << "Could not create LED matrix" << std::endl;
         return 1;
-    }
-
-    // Fill the screen with red
-    for (size_t y = 0; y < 32; y++) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        for (size_t x = 0; x < 128; x++) {
-            matrix->SetPixel(x, y, y*6, 0, x*3);
-        }
     }
 
     vector <vector<TZColor>> gradientMap = {
@@ -172,12 +280,14 @@ int main() {
 
     float time = 0;
 
+    float serialtime = 0;
+
+    
     // Serial port initialization
     const char* serialPort = "/dev/ttyACM0";
-    int serial_fd = open(serialPort, O_WRONLY | O_NOCTTY);  // Open the serial port
+    int serial_fd = open(serialPort, O_RDWR | O_NOCTTY);  // Open the serial port
     if (serial_fd == -1) {
         std::cerr << "Error: Could not open serial port: " << strerror(errno) << std::endl;
-        //return 1;
     }
 
     std::string last_message = "";
@@ -188,7 +298,7 @@ int main() {
     while (true) {
         auto start = std::chrono::high_resolution_clock::now();
 
-        // Your existing code for drawing the screen, etc.
+        memset(bit_buffer, 0, sizeof(bit_buffer));
         drawScreen(canvas, eyes.GetTexture().textureMap, eyes.GetTexture().textureMap_Open,
                    face.GetTexture().textureMap, preprocessedGradient, time);
 
@@ -198,6 +308,7 @@ int main() {
         std::chrono::duration<double, std::milli> duration = end - start;
 
         time += (duration.count() / 50);
+        serialtime += (duration.count() / 50);
 
         frameCount++;
 
@@ -214,33 +325,23 @@ int main() {
             frameCount = 0;
         }
 
-        if (time > 60) {
-            time = 0;
-            std::string face_part = "F: " + face.texture;
+        if (serialtime > 5) {
+            serialtime = 0;
         
-            // Convert FPS to an integer and then to a string
+            std::string face_part = face.texture;
+        
             int fps_int = static_cast<int>(fps);
             std::string fps_str = std::to_string(fps_int);
         
-            // Calculate the number of spaces needed to align FPS to the right within the first 16 characters
-            int spaces_needed = 16 - (face_part.size() + fps_str.size() + 1);  // +1 for the space before FPS
-            while (spaces_needed > 0) {
-                face_part += " ";  // Add spaces to the end of face_part
-                spaces_needed--;
-            }
+            std::string eyes_part = eyes.texture;
         
-            // Append FPS value
-            face_part += " " + fps_str;
-        
-            std::string eyes_part = "E: " + eyes.texture;
-            
-            // Check if there are any remaining characters for the second row
-            //std::string message = face_part + eyes_part;
-            //if (last_message != message) {
-            //    last_message = message;
-            //    ssize_t bytes_written = write(serial_fd, message.c_str(), message.size());
-            //}
+            std::string bitmap_data = getBitmapData();
+
+            std::string message = "\n" + eyes_part + ";" + face_part + ";" + fps_str + ";" + base64_encode(packBitmap(bitmap_data)) + "\n";
+
+            send_in_chunks(serial_fd, message);
         }
+
         
     }
 
