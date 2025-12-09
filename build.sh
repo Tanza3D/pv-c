@@ -2,10 +2,8 @@
 
 export PKG_CONFIG_PATH=~/rpi-rgb-led-matrix/lib/pkgconfig:$PKG_CONFIG_PATH
 pkg-config --modversion rgbmatrix
-
-rm pv-c
+ 
+rm bin/pv-c
 
 cmake .
 make
-
-sudo ./pv-c

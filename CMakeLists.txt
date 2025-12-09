@@ -2,27 +2,29 @@ cmake_minimum_required(VERSION 3.12)
 project(pv-c)
 
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
 # Add the matrix directory as an include directory
 include_directories(matrix)
 
 # Define the source files
 set(SOURCE_FILES
-        main.cpp
-        gradient.cpp
-        Eyes.cpp
-        Face.cpp
-        TextureSource.cpp
-        Texture.cpp
-        stb_image.h
-        matrix/canvas.h
-        matrix/content-streamer.h
-        matrix/graphics.h
-        matrix/led-matrix-c.h
-        matrix/led-matrix.h
-        matrix/pixel-mapper.h
-        matrix/thread.h
-        matrix/threaded-canvas-manipulator.h
+        src/main.cpp
+        src/gradient.cpp
+        src/Eye.cpp
+        src/Eyes.cpp
+        src/Face.cpp
+        src/Faces.cpp
+        src/Texture.cpp
+        src/stb_image.h
+        src/matrix/canvas.h
+        src/matrix/content-streamer.h
+        src/matrix/graphics.h
+        src/matrix/led-matrix-c.h
+        src/matrix/led-matrix.h
+        src/matrix/pixel-mapper.h
+        src/matrix/thread.h
+        src/matrix/threaded-canvas-manipulator.h
 )
 
 # Add the rpi-rgb-led-matrix include directory
