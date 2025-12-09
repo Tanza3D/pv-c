@@ -7,7 +7,6 @@
 class Texture {
 public:
     std::vector<std::vector<double>> textureMap; // 0-1
-    std::vector<std::vector<double>> textureMap_Open; // 0-1
     Texture() = default;
     Texture(const std::string& path, const std::string& file);
 private:

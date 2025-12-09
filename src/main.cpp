@@ -6,13 +6,15 @@
 #include "matrix/led-matrix.h"
 #include "matrix/graphics.h"
 #include "Texture.h"
+#include "Eye.h"
 #include "Eyes.h"
 #include "Face.h"
+#include "Faces.h"
 #include <fstream>
-#include <fcntl.h>   
-#include <unistd.h> 
-#include <cstring> 
-#include <errno.h>  
+#include <fcntl.h>
+#include <unistd.h>
+#include <cstring>
+#include <errno.h>
 #include <iomanip>
 #include "base64.hpp"
 #include <thread>
@@ -20,7 +22,7 @@
 #include <queue>
 #include <condition_variable>
 
-void printBitmapData(const std::string& bitmap_data, int width, int height) {
+void printBitmapData(const std::string &bitmap_data, int width, int height) {
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             int index = y * width + x;
@@ -36,38 +38,31 @@ void printBitmapData(const std::string& bitmap_data, int width, int height) {
 }
 
 
-
 using namespace rgb_matrix;
 using namespace std;
 
 #define BIT_WIDTH 64
 #define BIT_HEIGHT 32
-uint8_t bit_buffer[BIT_WIDTH * BIT_HEIGHT / 8] = {0}; 
+uint8_t bit_buffer[BIT_WIDTH * BIT_HEIGHT / 8] = {0};
 
 
 void setBit(int i, bool value) {
-  if (value)
-    bit_buffer[i / 8] |= (1 << (i % 8));
-  else
-    bit_buffer[i / 8] &= ~(1 << (i % 8));
+    if (value)
+        bit_buffer[i / 8] |= (1 << (i % 8));
+    else
+        bit_buffer[i / 8] &= ~(1 << (i % 8));
 }
 
 bool getBit(int i) {
-  return (bit_buffer[i / 8] >> (i % 8)) & 1;
+    return (bit_buffer[i / 8] >> (i % 8)) & 1;
 }
 
 
-void setPixel(FrameCanvas *canvas, int x, int y, float alpha, const vector<vector<TZColor>> &gradient, int mirror = 1, bool eyes = false) {
+void setPixel(FrameCanvas *canvas, int x, int y, float alpha, const vector<vector<TZColor>> &gradient, int mirror = 1) {
     if (!(alpha > 0)) return;
     int orig_y = y;
     y = 32 - y;
     TZColor col = gradient[y][x];
-
-    if (eyes) {
-        col.r = 100;
-        col.g = 30;
-        col.b = 255;
-    }
 
     if (mirror < 2) canvas->SetPixel(x, y, col.r * alpha, col.g * alpha, col.b * alpha);
     if (mirror > 0) canvas->SetPixel(128 - x, y, col.r * alpha, col.g * alpha, col.b * alpha);
@@ -84,24 +79,24 @@ void setPixel(FrameCanvas *canvas, int x, int y, float alpha, const vector<vecto
 }
 
 std::string getBitmapData() {
- std::string result;
-  result.reserve(BIT_WIDTH * BIT_HEIGHT);
-  for (int i = 0; i < BIT_WIDTH * BIT_HEIGHT; i++) {
-    result += getBit(i) ? '1' : '0';
-  }
-  return result;
+    std::string result;
+    result.reserve(BIT_WIDTH * BIT_HEIGHT);
+    for (int i = 0; i < BIT_WIDTH * BIT_HEIGHT; i++) {
+        result += getBit(i) ? '1' : '0';
+    }
+    return result;
 }
 
-void drawImage(FrameCanvas *canvas, const vector <vector<double>> &image, const vector <vector<TZColor>> &gradient) {
+
+void drawImage(FrameCanvas *canvas, const Texture &image, const vector<vector<TZColor>> &gradient) {
     for (size_t y = 0; y < 32; y++) {
         for (size_t x = 0; x < 64; x++) {
-            setPixel(canvas, x, y, image[y][x], gradient);
+            setPixel(canvas, x, y, image.textureMap[y][x], gradient);
         }
     }
 }
 
-
-void drawPupil(FrameCanvas *canvas, const vector <vector<TZColor>> &gradient, const vector <vector<double>> &area,
+void drawPupil(FrameCanvas *canvas, const vector<vector<TZColor>> &gradient, const Texture &area,
                int time, float eyeX, float eyeY, bool mirror = false) {
 
     int eyeMinX = std::numeric_limits<int>::max();
@@ -109,9 +104,9 @@ void drawPupil(FrameCanvas *canvas, const vector <vector<TZColor>> &gradient, co
     int eyeMinY = std::numeric_limits<int>::max();
     int eyeMaxY = std::numeric_limits<int>::min();
 
-    for (int y = 0; y < area.size(); ++y) {
-        for (int x = 0; x < area[y].size(); ++x) {
-            if (area[y][x] == 1.0) {
+    for (int y = 0; y < area.textureMap.size(); ++y) {
+        for (int x = 0; x < area.textureMap[y].size(); ++x) {
+            if (area.textureMap[y][x] == 1.0) {
                 eyeMinX = std::min(eyeMinX, x);
                 eyeMaxX = std::max(eyeMaxX, x);
                 eyeMinY = std::min(eyeMinY, y);
@@ -130,7 +125,7 @@ void drawPupil(FrameCanvas *canvas, const vector <vector<TZColor>> &gradient, co
 
     pupilX = std::min(std::max(pupilX, eyeMinX + 1), eyeMaxX - 1);
     pupilY = std::min(std::max(pupilY, eyeMinY + 1), eyeMaxY - 1);
-    
+
 
     int width = 3;
     int height = 7;
@@ -146,16 +141,17 @@ void drawPupil(FrameCanvas *canvas, const vector <vector<TZColor>> &gradient, co
             int px = pupilX + dx;
             int py = pupilY + dy;
 
-            float alpha = area[py][px];
+            float alpha = area.textureMap[py][px];
 
             int m = 0;
-            if(mirror) {
+            if (mirror) {
                 m = 2;
             }
-            setPixel(canvas, px, py, alpha, gradient, m, true);
+            setPixel(canvas, px, py, alpha, gradient, m);
         }
     }
 }
+
 #include <cmath>
 #include <cstdlib>
 
@@ -163,28 +159,39 @@ double smoothOscillation(double time, double frequency, double amplitude) {
     return amplitude * sin(frequency * time);
 }
 
-void pupilHelper(FrameCanvas *canvas, const vector <vector<TZColor>> &gradient, const vector <vector<double>> &area,
+void pupilHelper(FrameCanvas *canvas, const vector<vector<TZColor>> &gradient, const Texture &area,
                  int time) {
 
+    // oscillation from smoothOscillation: -0.5 .. 0.5
     double oscillationX = smoothOscillation(time * 0.1, 0.5, 0.5);
+    double oscBase = oscillationX * 1.1; // max oscillation scale
 
-    double pupilOffsetX_left = 0.5 - (oscillationX * 0.7);
-    double pupilOffsetX_right = 0.5 + (oscillationX * 0.7);
+    // left pupil: -0.5 -> 0, 0 -> 1, 0.5 -> 1
+    double pupilOffsetX_left = std::clamp(oscBase + 1.0, 0.0, 1.0) - 0.3;
+    // right pupil: -0.5 -> 1, 0 -> 1, 0.5 -> 0
+    double pupilOffsetX_right = std::clamp(1.0 - oscBase, 0.0, 1.0) - 0.3;
 
     drawPupil(canvas, gradient, area, time, pupilOffsetX_left, 0.3);
     drawPupil(canvas, gradient, area, time, pupilOffsetX_right, 0.3, true);
 }
 
 
-void drawScreen(FrameCanvas *canvas, const vector <vector<double>> eyes, const vector <vector<double>> pupilArea,
-                const vector <vector<double>> face, const vector <vector<TZColor>> &gradient, int time) {
+void drawScreen(FrameCanvas *canvas, const Eye eye,
+                const Face face, const vector<vector<TZColor>> &gradient, int time) {
     canvas->Fill(0, 0, 0);
 
-    pupilHelper(canvas, gradient, pupilArea, time);
 
+    vector<vector<TZColor>> pupilGradient = gradient;
+    vector<vector<TZColor>> eyeGradient = gradient;
+    vector<vector<TZColor>> faceGradient = gradient;
 
-    drawImage(canvas, eyes, gradient);
-    drawImage(canvas, face, gradient);
+    if (eye.hasOverride) eyeGradient = eye.override;
+    if (eye.hasPupilOverride) pupilGradient = eye.pupilOverride;
+    if (face.hasOverride) faceGradient = face.override;
+
+    pupilHelper(canvas, pupilGradient, eye.GetPupilAreaTexture(), time);
+    drawImage(canvas, eye.GetTexture(), eyeGradient);
+    drawImage(canvas, face.GetTexture(), faceGradient);
 }
 
 
@@ -214,7 +221,7 @@ void send_in_chunks(int serial_fd, const std::string &message, size_t chunk_size
 }
 
 
-std::string packBitmap(const std::string& bits) {
+std::string packBitmap(const std::string &bits) {
     std::string packed;
     for (size_t i = 0; i < bits.size(); i += 8) {
         std::string byte_str = bits.substr(i, 8);
@@ -227,11 +234,11 @@ std::string packBitmap(const std::string& bits) {
 
 std::string base64_encode(const std::string &in) {
     static const std::string b64_chars =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
     std::string out;
     int val = 0, valb = -6;
-    for (unsigned char c : in) {
+    for (unsigned char c: in) {
         val = (val << 8) + c;
         valb += 8;
         while (valb >= 0) {
@@ -253,7 +260,7 @@ int main() {
     defaults.hardware_mapping = "adafruit-hat";
 
     RuntimeOptions runtime;
-    runtime.gpio_slowdown = 2;
+    runtime.gpio_slowdown = 5;
     defaults.brightness = 100;
     defaults.limit_refresh_rate_hz = 90;
 
@@ -263,18 +270,17 @@ int main() {
         return 1;
     }
 
-    vector <vector<TZColor>> gradientMap = {
-            {{255, 100, 190}, {200, 20, 141}},
-            {{51, 20,  190}, {255, 105, 200}},
+    vector<vector<TZColor>> gradientMap = {
+            {{255, 100, 190}, {200, 20,  141}},
+            {{51,  20,  190}, {255, 105, 200}},
     };
-    vector <vector<TZColor>> preprocessedGradient = Gradient::preprocessGradient(gradientMap, 65, 33);
+    vector<vector<TZColor>> preprocessedGradient = Gradient::preprocessGradient(gradientMap);
 
     Eyes eyes = Eyes();
-    Face face = Face();
+    Faces faces = Faces();
     eyes.Init();
-    face.Init();
-    std::cout << "Eyes texture size: " << eyes.GetTexture().textureMap.size() << "x"
-         << eyes.GetTexture().textureMap[0].size() << std::endl;
+    faces.Init();
+
 
     FrameCanvas *canvas = matrix->CreateFrameCanvas();
 
@@ -282,9 +288,9 @@ int main() {
 
     float serialtime = 0;
 
-    
+
     // Serial port initialization
-    const char* serialPort = "/dev/ttyACM0";
+    const char *serialPort = "/dev/ttyACM0";
     int serial_fd = open(serialPort, O_RDWR | O_NOCTTY);  // Open the serial port
     if (serial_fd == -1) {
         std::cerr << "Error: Could not open serial port: " << strerror(errno) << std::endl;
@@ -299,8 +305,9 @@ int main() {
         auto start = std::chrono::high_resolution_clock::now();
 
         memset(bit_buffer, 0, sizeof(bit_buffer));
-        drawScreen(canvas, eyes.GetTexture().textureMap, eyes.GetTexture().textureMap_Open,
-                   face.GetTexture().textureMap, preprocessedGradient, time);
+        drawScreen(canvas,
+                   eyes.GetCurrent(),
+                   faces.GetCurrent(), preprocessedGradient, time);
 
         canvas = matrix->SwapOnVSync(canvas);
 
@@ -315,7 +322,7 @@ int main() {
         // Calculate FPS every second
         auto currentTime = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsedTime = currentTime - lastTime;
-        
+
         if (elapsedTime.count() >= 1.0) {  // If 1 second has passed
             fps = frameCount / elapsedTime.count();
             std::cout << "FPS: " << fps << std::endl;
@@ -327,22 +334,24 @@ int main() {
 
         if (serialtime > 5) {
             serialtime = 0;
-        
-            std::string face_part = face.texture;
-        
+
+            std::string face_part = faces.GetCurrentName();
+
             int fps_int = static_cast<int>(fps);
             std::string fps_str = std::to_string(fps_int);
-        
-            std::string eyes_part = eyes.texture;
-        
+
+            std::string eyes_part = eyes.GetCurrentName();
+
             std::string bitmap_data = getBitmapData();
 
-            std::string message = "\n" + eyes_part + ";" + face_part + ";" + fps_str + ";" + base64_encode(packBitmap(bitmap_data)) + "\n";
+            std::string message =
+                    "\n" + eyes_part + ";" + face_part + ";" + fps_str + ";" + base64_encode(packBitmap(bitmap_data)) +
+                    "\n";
 
             send_in_chunks(serial_fd, message);
         }
 
-        
+
     }
 
     // Clean up

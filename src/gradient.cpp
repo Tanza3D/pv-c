@@ -2,6 +2,38 @@
 #include <algorithm>
 #include <cmath>
 
+#include <string>
+#include <sstream>
+#include <vector>
+
+TZColor hexToTZColor(const std::string &hex) {
+    unsigned int r, g, b;
+    if (hex[0] == '#') {
+        std::stringstream ss;
+        ss << std::hex << hex.substr(1, 2);
+        ss >> r;
+        ss.clear();
+        ss << std::hex << hex.substr(3, 2);
+        ss >> g;
+        ss.clear();
+        ss << std::hex << hex.substr(5, 2);
+        ss >> b;
+    } else { // without #
+        std::stringstream ss;
+        ss << std::hex << hex.substr(0, 2);
+        ss >> r;
+        ss.clear();
+        ss << std::hex << hex.substr(2, 2);
+        ss >> g;
+        ss.clear();
+        ss << std::hex << hex.substr(4, 2);
+        ss >> b;
+    }
+    return {static_cast<double>(static_cast<int>(r)), static_cast<double>(static_cast<int>(g)), static_cast<double>(static_cast<int>(b))};
+}
+
+
+
 TZHSL Gradient::tz_rgbToHsl(const TZColor &color) {
     double r = color.r / 255.0;
     double g = color.g / 255.0;
@@ -82,4 +114,14 @@ std::vector<std::vector<TZColor>> Gradient::preprocessGradient(const std::vector
         }
     }
     return result;
+}
+
+std::vector<std::vector<TZColor>> Gradient::easyGradient(const std::string &topLeftHex,
+                                               const std::string &topRightHex,
+                                               const std::string &bottomLeftHex,
+                                               const std::string &bottomRightHex) {
+    return {
+            {hexToTZColor(topLeftHex), hexToTZColor(topRightHex)},
+            {hexToTZColor(bottomLeftHex), hexToTZColor(bottomRightHex)}
+    };
 }

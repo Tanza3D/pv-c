@@ -25,10 +25,6 @@ void Texture::loadTexture(const std::string& filePath, std::vector<std::vector<d
 }
 
 Texture::Texture(const std::string& path, const std::string& file) {
-
     std::string normal = path + + "/" +  file + ".png";
-    std::string open = path + "/open_" + file + ".png";
-
     loadTexture(normal, textureMap);
-    loadTexture(open, textureMap_Open);
 }
