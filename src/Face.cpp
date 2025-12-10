@@ -12,7 +12,9 @@ Texture Face::GetTexture() const {
 }
 
 void Face::SetColourOverride(std::vector<std::vector<TZColor>> gradient) {
+#ifndef ESP_PLATFORM
     hasOverride = true;
     override = gradient;
+#endif
 }
 

@@ -22,3 +22,11 @@ Face Faces::GetCurrent()  {
 std::string Faces::GetCurrentName() {
     return currentFace;
 }
+
+std::vector<std::string> Faces::getTextureNames() {
+    std::vector<std::string> names;
+    for (const auto& pair : faces) {
+        names.push_back(pair.first);
+    }
+    return names;
+}

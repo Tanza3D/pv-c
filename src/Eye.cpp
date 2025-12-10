@@ -13,13 +13,17 @@ Texture Eye::GetTexture() const {
 }
 
 void Eye::SetColourOverride(std::vector<std::vector<TZColor>> gradient) {
+#ifndef ESP_PLATFORM
     hasOverride = true;
     override = gradient;
+#endif
 }
 
 void Eye::SetPupilColourOverride(std::vector<std::vector<TZColor>> gradient) {
+#ifndef ESP_PLATFORM
     hasPupilOverride = true;
     pupilOverride = gradient;
+#endif
 }
 
 

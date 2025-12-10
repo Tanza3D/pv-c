@@ -17,6 +17,7 @@ public:
     Eye GetCurrent();
 
     std::string GetCurrentName();
+    std::vector<std::string> getTextureNames();
 };
 
 #endif
