@@ -30,3 +30,11 @@ std::vector<std::string> Faces::getTextureNames() {
     }
     return names;
 }
+
+bool Faces::SetCurrent(const std::string& name) {
+    if (faces.find(name) != faces.end()) {
+        currentFace = name;
+        return true;
+    }
+    return false;
+}

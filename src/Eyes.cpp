@@ -35,3 +35,11 @@ std::vector<std::string> Eyes::getTextureNames() {
     }
     return names;
 }
+
+bool Eyes::SetCurrent(const std::string& name) {
+    if (eyes.find(name) != eyes.end()) {
+        currentEye = name;
+        return true;
+    }
+    return false;
+}

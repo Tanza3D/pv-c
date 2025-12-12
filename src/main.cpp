@@ -21,6 +21,34 @@
 #include <mutex>
 #include <queue>
 #include <condition_variable>
+#include <termios.h>
+#include <poll.h>
+#include <atomic>
+#include <sstream>
+
+// Simple JSON value extraction (avoids external dependency)
+std::string extractJsonString(const std::string& json, const std::string& key) {
+    std::string searchKey = "\"" + key + "\":\"";
+    size_t pos = json.find(searchKey);
+    if (pos == std::string::npos) return "";
+    pos += searchKey.length();
+    size_t end = json.find("\"", pos);
+    if (end == std::string::npos) return "";
+    return json.substr(pos, end - pos);
+}
+
+int extractJsonInt(const std::string& json, const std::string& key) {
+    std::string searchKey = "\"" + key + "\":";
+    size_t pos = json.find(searchKey);
+    if (pos == std::string::npos) return -1;
+    pos += searchKey.length();
+    // Skip whitespace
+    while (pos < json.length() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
+    size_t end = pos;
+    while (end < json.length() && (isdigit(json[end]) || json[end] == '-')) end++;
+    if (end == pos) return -1;
+    return std::stoi(json.substr(pos, end - pos));
+}
 
 void printBitmapData(const std::string &bitmap_data, int width, int height) {
     for (int y = 0; y < height; y++) {
@@ -291,18 +319,94 @@ int main() {
 
     // Serial port initialization
     const char *serialPort = "/dev/ttyACM0";
-    int serial_fd = open(serialPort, O_RDWR | O_NOCTTY);  // Open the serial port
+    int serial_fd = open(serialPort, O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (serial_fd == -1) {
         std::cerr << "Error: Could not open serial port: " << strerror(errno) << std::endl;
+    } else {
+        // Configure serial port
+        struct termios tty;
+        if (tcgetattr(serial_fd, &tty) == 0) {
+            cfsetospeed(&tty, B115200);
+            cfsetispeed(&tty, B115200);
+            tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;
+            tty.c_cflag &= ~PARENB;
+            tty.c_cflag &= ~CSTOPB;
+            tty.c_cflag |= CREAD | CLOCAL;
+            tty.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+            tty.c_iflag &= ~(IXON | IXOFF | IXANY);
+            tty.c_oflag &= ~OPOST;
+            tcsetattr(serial_fd, TCSANOW, &tty);
+        }
+        std::cout << "Serial port opened successfully" << std::endl;
     }
 
+    std::string serial_buffer = "";
     std::string last_message = "";
+    int currentBrightness = 100;
 
     int frameCount = 0;
     auto lastTime = std::chrono::high_resolution_clock::now();
     double fps = 0;
     while (true) {
         auto start = std::chrono::high_resolution_clock::now();
+
+        // Read from serial (non-blocking)
+        if (serial_fd != -1) {
+            char buf[256];
+            ssize_t n = read(serial_fd, buf, sizeof(buf) - 1);
+            if (n > 0) {
+                buf[n] = '\0';
+                serial_buffer += buf;
+                
+                // Process complete lines
+                size_t newline_pos;
+                while ((newline_pos = serial_buffer.find('\n')) != std::string::npos) {
+                    std::string line = serial_buffer.substr(0, newline_pos);
+                    serial_buffer = serial_buffer.substr(newline_pos + 1);
+                    
+                    // Remove carriage return if present
+                    if (!line.empty() && line.back() == '\r') {
+                        line.pop_back();
+                    }
+                    
+                    // Process JSON
+                    if (!line.empty() && line[0] == '{') {
+                        std::string event = extractJsonString(line, "event");
+                        
+                        if (event == "options") {
+                            std::string face = extractJsonString(line, "face");
+                            std::string eyesName = extractJsonString(line, "eyes");
+                            int brightness = extractJsonInt(line, "brightness");
+                            
+                            if (!face.empty()) {
+                                if (faces.SetCurrent(face)) {
+                                    std::cout << "Face set to: " << face << std::endl;
+                                } else {
+                                    std::cout << "Unknown face: " << face << std::endl;
+                                }
+                            }
+                            
+                            if (!eyesName.empty()) {
+                                if (eyes.SetCurrent(eyesName)) {
+                                    std::cout << "Eyes set to: " << eyesName << std::endl;
+                                } else {
+                                    std::cout << "Unknown eyes: " << eyesName << std::endl;
+                                }
+                            }
+                            
+                            if (brightness >= 0 && brightness <= 100) {
+                                currentBrightness = brightness;
+                                matrix->SetBrightness(brightness);
+                                std::cout << "Brightness set to: " << brightness << std::endl;
+                            }
+                        } else if (event == "restart") {
+                            std::cout << "Restart event received" << std::endl;
+                            // Could add restart logic here if needed
+                        }
+                    }
+                }
+            }
+        }
 
         memset(bit_buffer, 0, sizeof(bit_buffer));
         drawScreen(canvas,
@@ -335,18 +439,10 @@ int main() {
         if (serialtime > 5) {
             serialtime = 0;
 
-            std::string face_part = faces.GetCurrentName();
-
-            int fps_int = static_cast<int>(fps);
-            std::string fps_str = std::to_string(fps_int);
-
-            std::string eyes_part = eyes.GetCurrentName();
-
             std::string bitmap_data = getBitmapData();
 
-            std::string message =
-                    "\n" + eyes_part + ";" + face_part + ";" + fps_str + ";" + base64_encode(packBitmap(bitmap_data)) +
-                    "\n";
+            // Create JSON message with only the image data
+            std::string message = "{\"image\":\"" + base64_encode(packBitmap(bitmap_data)) + "\"}\n";
 
             send_in_chunks(serial_fd, message);
         }
