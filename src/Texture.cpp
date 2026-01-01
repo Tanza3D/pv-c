@@ -6,7 +6,7 @@
 #include "Texture.h"
 #include <iostream>
 
-void Texture::loadTexture(const std::string& filePath, std::vector<std::vector<double>>& textureMap) {
+void Texture::loadTexture(const std::string& filePath, std::vector<std::vector<double>>& textureMap, ColorChannel channel) {
 #ifndef ESP_PLATFORM
     int width, height, channels;
     unsigned char* data = stbi_load(filePath.c_str(), &width, &height, &channels, 0);
@@ -16,10 +16,26 @@ void Texture::loadTexture(const std::string& filePath, std::vector<std::vector<d
             for (int x = 0; x < width; ++x) {
                 int index = (y * width + x) * channels;
                 unsigned char r = data[index];
-                unsigned char g = data[index + 1];
-                unsigned char b = data[index + 2];
+                unsigned char g = (channels >= 2) ? data[index + 1] : 0;
+                unsigned char b = (channels >= 3) ? data[index + 2] : 0;
                 unsigned char a = (channels == 4) ? data[index + 3] : 255;
-                textureMap[y][x] = static_cast<double>(a) / 255.0; // Store alpha as a double in range [0, 1]
+                
+                // Extract the specified channel (only if pixel is not fully transparent)
+                double value = 0.0;
+                if (a > 0) {
+                    switch (channel) {
+                        case ColorChannel::RED:
+                            value = (r == 255) ? 1.0 : 0.0;
+                            break;
+                        case ColorChannel::GREEN:
+                            value = (g == 255) ? 1.0 : 0.0;
+                            break;
+                        case ColorChannel::BLUE:
+                            value = (b == 255) ? 1.0 : 0.0;
+                            break;
+                    }
+                }
+                textureMap[y][x] = value;
             }
         }
         stbi_image_free(data);
@@ -31,15 +47,17 @@ void Texture::loadTexture(const std::string& filePath, std::vector<std::vector<d
     std::cerr << "Skipping texture load from: " << filePath << " because we're on ESP platform" << std::endl;
     (void)filePath;
     (void)textureMap;
+    (void)channel;
 #endif
 }
 
-Texture::Texture(const std::string& path, const std::string& file) {
+Texture::Texture(const std::string& path, const std::string& file, ColorChannel channel) {
 #ifndef ESP_PLATFORM
     std::string normal = path + + "/" +  file + ".png";
-    loadTexture(normal, textureMap);
+    loadTexture(normal, textureMap, channel);
 #else
     (void)path;
     (void)file;
+    (void)channel;
 #endif
 }

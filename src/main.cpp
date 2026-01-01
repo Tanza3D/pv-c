@@ -124,17 +124,18 @@ void drawImage(FrameCanvas *canvas, const Texture &image, const vector<vector<TZ
     }
 }
 
-void drawPupil(FrameCanvas *canvas, const vector<vector<TZColor>> &gradient, const Texture &area,
-               int time, float eyeX, float eyeY, bool mirror = false) {
+void drawPupil(FrameCanvas *canvas, const vector<vector<TZColor>> &gradient, const Texture &pupilArea,
+               const Texture &pupilShape, int time, float eyeX, float eyeY, bool mirror = false) {
 
+    // Find the bounds of the pupil movement area
     int eyeMinX = std::numeric_limits<int>::max();
     int eyeMaxX = std::numeric_limits<int>::min();
     int eyeMinY = std::numeric_limits<int>::max();
     int eyeMaxY = std::numeric_limits<int>::min();
 
-    for (int y = 0; y < area.textureMap.size(); ++y) {
-        for (int x = 0; x < area.textureMap[y].size(); ++x) {
-            if (area.textureMap[y][x] == 1.0) {
+    for (int y = 0; y < pupilArea.textureMap.size(); ++y) {
+        for (int x = 0; x < pupilArea.textureMap[y].size(); ++x) {
+            if (pupilArea.textureMap[y][x] == 1.0) {
                 eyeMinX = std::min(eyeMinX, x);
                 eyeMaxX = std::max(eyeMaxX, x);
                 eyeMinY = std::min(eyeMinY, y);
@@ -148,34 +149,62 @@ void drawPupil(FrameCanvas *canvas, const vector<vector<TZColor>> &gradient, con
         return;
     }
 
-    int pupilX = eyeMinX + static_cast<int>((eyeMaxX - eyeMinX) * eyeX);
-    int pupilY = eyeMinY + static_cast<int>((eyeMaxY - eyeMinY) * eyeY);
+    // Calculate pupil center position based on eye position (0-1 range)
+    int pupilCenterX = eyeMinX + static_cast<int>((eyeMaxX - eyeMinX) * eyeX);
+    int pupilCenterY = eyeMinY + static_cast<int>((eyeMaxY - eyeMinY) * eyeY);
 
-    pupilX = std::min(std::max(pupilX, eyeMinX + 1), eyeMaxX - 1);
-    pupilY = std::min(std::max(pupilY, eyeMinY + 1), eyeMaxY - 1);
+    pupilCenterX = std::min(std::max(pupilCenterX, eyeMinX + 1), eyeMaxX - 1);
+    pupilCenterY = std::min(std::max(pupilCenterY, eyeMinY + 1), eyeMaxY - 1);
 
+    // Find the bounds and center of the pupil shape
+    int shapeMinX = std::numeric_limits<int>::max();
+    int shapeMaxX = std::numeric_limits<int>::min();
+    int shapeMinY = std::numeric_limits<int>::max();
+    int shapeMaxY = std::numeric_limits<int>::min();
 
-    int width = 3;
-    int height = 7;
-
-    for (int dy = 0; dy < height; dy++) {
-        for (int dx = 0; dx < width; dx++) {
-            if ((dy == 0 && dx == 0) ||
-                (dy == 0 && dx == width - 1) ||
-                (dy == height - 1 && dx == 0) ||
-                (dy == height - 1 && dx == width - 1))
-                continue;
-
-            int px = pupilX + dx;
-            int py = pupilY + dy;
-
-            float alpha = area.textureMap[py][px];
-
-            int m = 0;
-            if (mirror) {
-                m = 2;
+    for (int y = 0; y < pupilShape.textureMap.size(); ++y) {
+        for (int x = 0; x < pupilShape.textureMap[y].size(); ++x) {
+            if (pupilShape.textureMap[y][x] == 1.0) {
+                shapeMinX = std::min(shapeMinX, x);
+                shapeMaxX = std::max(shapeMaxX, x);
+                shapeMinY = std::min(shapeMinY, y);
+                shapeMaxY = std::max(shapeMaxY, y);
             }
-            setPixel(canvas, px, py, alpha, gradient, m);
+        }
+    }
+
+    if (shapeMinX == std::numeric_limits<int>::max()) {
+        return; // No pupil shape defined
+    }
+
+    // Calculate the shape's center point
+    int shapeCenterX = (shapeMinX + shapeMaxX) / 2;
+    int shapeCenterY = (shapeMinY + shapeMaxY) / 2;
+
+    // Calculate offset to center the shape at pupil position
+    int offsetX = pupilCenterX - shapeCenterX;
+    int offsetY = pupilCenterY - shapeCenterY;
+
+    // Draw the pupil shape at the calculated position
+    for (int y = 0; y < pupilShape.textureMap.size(); ++y) {
+        for (int x = 0; x < pupilShape.textureMap[y].size(); ++x) {
+            if (pupilShape.textureMap[y][x] == 1.0) {
+                int px = x + offsetX;
+                int py = y + offsetY;
+
+                // Check bounds
+                if (py >= 0 && py < pupilArea.textureMap.size() && 
+                    px >= 0 && px < pupilArea.textureMap[py].size()) {
+                    
+                    float alpha = pupilArea.textureMap[py][px];
+
+                    int m = 0;
+                    if (mirror) {
+                        m = 2;
+                    }
+                    setPixel(canvas, px, py, alpha, gradient, m);
+                }
+            }
         }
     }
 }
@@ -187,8 +216,8 @@ double smoothOscillation(double time, double frequency, double amplitude) {
     return amplitude * sin(frequency * time);
 }
 
-void pupilHelper(FrameCanvas *canvas, const vector<vector<TZColor>> &gradient, const Texture &area,
-                 int time) {
+void pupilHelper(FrameCanvas *canvas, const vector<vector<TZColor>> &gradient, const Texture &pupilArea,
+                 const Texture &pupilShape, int time) {
 
     // oscillation from smoothOscillation: -0.5 .. 0.5
     double oscillationX = smoothOscillation(time * 0.1, 0.5, 0.5);
@@ -199,8 +228,8 @@ void pupilHelper(FrameCanvas *canvas, const vector<vector<TZColor>> &gradient, c
     // right pupil: -0.5 -> 1, 0 -> 1, 0.5 -> 0
     double pupilOffsetX_right = std::clamp(1.0 - oscBase, 0.0, 1.0) - 0.3;
 
-    drawPupil(canvas, gradient, area, time, pupilOffsetX_left, 0.3);
-    drawPupil(canvas, gradient, area, time, pupilOffsetX_right, 0.3, true);
+    drawPupil(canvas, gradient, pupilArea, pupilShape, time, pupilOffsetX_left, 0.3);
+    drawPupil(canvas, gradient, pupilArea, pupilShape, time, pupilOffsetX_right, 0.3, true);
 }
 
 
@@ -217,8 +246,8 @@ void drawScreen(FrameCanvas *canvas, const Eye eye,
     if (eye.hasPupilOverride) pupilGradient = eye.pupilOverride;
     if (face.hasOverride) faceGradient = face.override;
 
-    pupilHelper(canvas, pupilGradient, eye.GetPupilAreaTexture(), time);
-    drawImage(canvas, eye.GetTexture(), eyeGradient);
+    pupilHelper(canvas, pupilGradient, eye.GetPupilAreaTexture(), eye.GetPupilShapeTexture(), time);
+    drawImage(canvas, eye.GetEyeTexture(), eyeGradient);
     drawImage(canvas, face.GetTexture(), faceGradient);
 }
 

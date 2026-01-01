@@ -8,8 +8,9 @@ public:
     Eye();
 
     Eye(const std::string& name, const std::string& path);
-    Texture GetTexture() const;
+    Texture GetEyeTexture() const;
     Texture GetPupilAreaTexture() const;
+    Texture GetPupilShapeTexture() const;
 
     void SetColourOverride(std::vector<std::vector<TZColor>>);
     void SetPupilColourOverride(std::vector<std::vector<TZColor>>);
@@ -21,6 +22,7 @@ public:
     std::vector<std::vector<TZColor>> pupilOverride;
 private:
     std::string name;
-    Texture texture;
-    Texture pupilAreaTexture;
+    Texture eyeTexture;        // Blue channel - the eye shape
+    Texture pupilAreaTexture;  // Red channel - where the pupil can move
+    Texture pupilShapeTexture; // Green channel - the pupil shape itself
 };

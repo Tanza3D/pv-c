@@ -1,16 +1,52 @@
-CMakeFiles
-cmake-build-debug
+# CMake build files
+CMakeFiles/
+cmake-build-debug/
 CMakeCache.txt
 CMakeLists.txt.user
-CMakeCache.txt
-CMakeFiles
-CMakeScripts
-Testing
+CMakeScripts/
+Testing/
 Makefile
 cmake_install.cmake
 install_manifest.txt
 compile_commands.json
 CTestTestfile.cmake
-_deps
+_deps/
 CMakeUserPresets.json
+
+# Build output
+bin/
+build/
+*.o
+*.a
+*.so
 pv-c
+
+# Ninja build files
+.ninja_deps
+.ninja_log
+build.ninja
+
+# Python/UV lock files
+*.lock
+uv-*.lock
+
+# Temporary directories
+phantomjs/
+node-compile-cache/
+hsperfdata_*/
+
+# Archives
+*.zip
+*.tar.gz
+*.tar.bz2
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# System files
+Thumbs.db

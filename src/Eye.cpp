@@ -3,13 +3,27 @@
 
 
 Eye::Eye()
-        : name(""), texture("", ""), pupilAreaTexture("", "_pe") {}
-Eye::Eye(const std::string& name, const std::string& path)
-        : name(name), texture(path, name), pupilAreaTexture(path, name + "_pe") {}
+        : name(""), 
+          eyeTexture("", "", ColorChannel::BLUE),
+          pupilAreaTexture("", "", ColorChannel::RED),
+          pupilShapeTexture("", "", ColorChannel::GREEN) {}
 
-Texture Eye::GetTexture() const {
-    Texture t = texture;
-    return t;
+Eye::Eye(const std::string& name, const std::string& path)
+        : name(name), 
+          eyeTexture(path, name, ColorChannel::BLUE),
+          pupilAreaTexture(path, name, ColorChannel::RED),
+          pupilShapeTexture(path, name, ColorChannel::GREEN) {}
+
+Texture Eye::GetEyeTexture() const {
+    return eyeTexture;
+}
+
+Texture Eye::GetPupilAreaTexture() const {
+    return pupilAreaTexture;
+}
+
+Texture Eye::GetPupilShapeTexture() const {
+    return pupilShapeTexture;
 }
 
 void Eye::SetColourOverride(std::vector<std::vector<TZColor>> gradient) {
@@ -24,11 +38,4 @@ void Eye::SetPupilColourOverride(std::vector<std::vector<TZColor>> gradient) {
     hasPupilOverride = true;
     pupilOverride = gradient;
 #endif
-}
-
-
-
-Texture Eye::GetPupilAreaTexture() const {
-    Texture t = pupilAreaTexture;
-    return t;
 }
