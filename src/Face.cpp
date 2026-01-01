@@ -1,13 +1,13 @@
 #include "Face.h"
 
 Face::Face(const std::string& name, const std::string& path)
-    : name(name), texture(path, name) {};
+    : name(name), texture(path, name, ColorChannel::ALPHA), texture_open(path, name + "_open", ColorChannel::ALPHA) {};
 Face::Face()
-        : name(""), texture("", "") {}  // default constructor
+    : name(""), texture("", "", ColorChannel::ALPHA), texture_open("", "", ColorChannel::ALPHA) {}  // default constructor
 
 
-Texture Face::GetTexture() const {
-    Texture t = texture;
+Texture Face::GetTexture(bool open) const {
+    Texture t = open ? texture_open : texture;
     return t;
 }
 

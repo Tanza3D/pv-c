@@ -20,21 +20,36 @@ void Texture::loadTexture(const std::string& filePath, std::vector<std::vector<d
                 unsigned char b = (channels >= 3) ? data[index + 2] : 0;
                 unsigned char a = (channels == 4) ? data[index + 3] : 255;
                 
-                // Extract the specified channel (only if pixel is not fully transparent)
                 double value = 0.0;
-                if (a > 0) {
-                    switch (channel) {
-                        case ColorChannel::RED:
-                            value = (r == 255) ? 1.0 : 0.0;
-                            break;
-                        case ColorChannel::GREEN:
-                            value = (g == 255) ? 1.0 : 0.0;
-                            break;
-                        case ColorChannel::BLUE:
-                            value = (b == 255) ? 1.0 : 0.0;
-                            break;
-                    }
+                
+                switch (channel) {
+                    case ColorChannel::ALPHA:
+                        // For Face textures - just use alpha directly
+                        value = static_cast<double>(a) / 255.0;
+                        break;
+                        
+                    case ColorChannel::RED:
+                        // For Eye textures - check if red channel is active, then use alpha for anti-aliasing
+                        if (r == 255) {
+                            value = static_cast<double>(a) / 255.0;
+                        }
+                        break;
+                        
+                    case ColorChannel::GREEN:
+                        // For Eye textures - check if green channel is active, then use alpha for anti-aliasing
+                        if (g == 255) {
+                            value = static_cast<double>(a) / 255.0;
+                        }
+                        break;
+                        
+                    case ColorChannel::BLUE:
+                        // For Eye textures - check if blue channel is active, then use alpha for anti-aliasing
+                        if (b == 255) {
+                            value = static_cast<double>(a) / 255.0;
+                        }
+                        break;
                 }
+                
                 textureMap[y][x] = value;
             }
         }

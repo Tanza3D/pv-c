@@ -8,13 +8,15 @@ public:
     Face();
 
     Face(const std::string& name, const std::string& path);
-    Texture GetTexture() const;
+    Texture GetTexture(bool open = false) const;
 
     void SetColourOverride(std::vector<std::vector<TZColor>>);
      
     bool hasOverride = false;
     std::vector<std::vector<TZColor>> override;
+
 private:
     std::string name;
     Texture texture;
+    Texture texture_open;
 };

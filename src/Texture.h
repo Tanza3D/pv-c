@@ -5,9 +5,10 @@
 #include <string>
 
 enum class ColorChannel {
-    RED,    // Extract red channel (r == 255)
-    GREEN,  // Extract green channel (g == 255)
-    BLUE    // Extract blue channel (b == 255)
+    RED,    // Extract red channel (r == 255) with alpha
+    GREEN,  // Extract green channel (g == 255) with alpha
+    BLUE,   // Extract blue channel (b == 255) with alpha
+    ALPHA   // Extract alpha channel only (for Face textures)
 };
 
 class Texture {
