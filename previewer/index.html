@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PV-C Texture Previewer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+    <aside class="sidebar">
+        <h2>Textures</h2>
+
+        <div class="upload-section">
+            <label>Eye Texture</label>
+            <div class="dropzone" id="eye-dropzone">
+                <input type="file" id="eye-upload" accept="image/png" hidden>
+                <div class="dropzone-content">
+                    <span class="dropzone-text">drag or click to upload</span>
+                </div>
+                <canvas id="eye-preview" class="texture-preview" width="64" height="32"></canvas>
+            </div>
+        </div>
+
+        <div class="upload-section">
+            <label>Mouth Texture</label>
+            <div class="dropzone" id="mouth-dropzone">
+                <input type="file" id="mouth-upload" accept="image/png" hidden>
+                <div class="dropzone-content">
+                    <span class="dropzone-text">drag or click to upload</span>
+                </div>
+                <canvas id="mouth-preview" class="texture-preview" width="64" height="32"></canvas>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="animate-toggle" checked>
+                    <span>Animate Pupils</span>
+                </label>
+            </div>
+
+            <div id="manual-controls" class="manual-controls" style="display: none;">
+                <div class="slider-group">
+                    <label>
+                        Pupil X: <span id="pupil-x-value">0.50</span>
+                    </label>
+                    <input type="range" id="pupil-x-slider" min="0" max="1" step="0.01" value="0.5">
+                </div>
+
+                <div class="slider-group">
+                    <label>
+                        Pupil Y: <span id="pupil-y-value">0.50</span>
+                    </label>
+                    <input type="range" id="pupil-y-slider" min="0" max="1" step="0.01" value="0.5">
+                </div>
+            </div>
+
+            <button id="reset-btn">Reset</button>
+        </div>
+    </aside>
+
+    <main class="preview-area">
+        <div class="canvas-container">
+            <canvas id="matrix-canvas" width="128" height="32"></canvas>
+            <canvas id="matrix-canvas-glow" width="128" height="32"></canvas>
+        </div>
+    </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
