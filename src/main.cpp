@@ -29,8 +29,8 @@
 #include <atomic>
 #include <sstream>
 
-// Simple JSON value extraction (avoids external dependency)
-std::string extractJsonString(const std::string& json, const std::string& key) {
+
+std::string extractJsonString(const std::string &json, const std::string &key) {
     std::string searchKey = "\"" + key + "\":\"";
     size_t pos = json.find(searchKey);
     if (pos == std::string::npos) return "";
@@ -40,7 +40,7 @@ std::string extractJsonString(const std::string& json, const std::string& key) {
     return json.substr(pos, end - pos);
 }
 
-int extractJsonInt(const std::string& json, const std::string& key) {
+int extractJsonInt(const std::string &json, const std::string &key) {
     std::string searchKey = "\"" + key + "\":";
     size_t pos = json.find(searchKey);
     if (pos == std::string::npos) return -1;
@@ -72,11 +72,9 @@ void printBitmapData(const std::string &bitmap_data, int width, int height) {
 using namespace rgb_matrix;
 using namespace std;
 
-// Draw modes for setPixel function
 enum DrawMode {
-    DRAW_MODE_DISPLAY,   // Normal display output
-    DRAW_MODE_PREVIEW,   // Preview for controls screen (white/black only)
-    DRAW_MODE_SERIAL     // Serial bitmap output (existing functionality)
+    DRAW_MODE_DISPLAY,
+    DRAW_MODE_PREVIEW
 };
 
 DrawMode current_draw_mode = DRAW_MODE_DISPLAY;
@@ -84,7 +82,7 @@ DrawMode current_draw_mode = DRAW_MODE_DISPLAY;
 #define BIT_WIDTH 64
 #define BIT_HEIGHT 32
 uint8_t bit_buffer[BIT_WIDTH * BIT_HEIGHT / 8] = {0};
-uint8_t preview_buffer[BIT_WIDTH * BIT_HEIGHT] = {0}; // Preview buffer for controls screen (1 bit per pixel)
+uint8_t preview_buffer[BIT_WIDTH * BIT_HEIGHT] = {0};
 
 
 void setBit(int i, bool value) {
@@ -99,31 +97,27 @@ bool getBit(int i) {
 }
 
 
-void setPixel(FrameCanvas *canvas, int x, int y, float alpha, const vector<vector<TZColor>> &gradient, int mirror = 1) {
+void setPixel(FrameCanvas *canvas, int x, int y, float alpha, const vector<vector<TZColor> > &gradient,
+              int mirror = 1) {
     if (!(alpha > 0)) return;
     int orig_y = y;
     y = 32 - y;
     TZColor col = gradient[y][x];
 
-    // Calculate brightness (simple luminance formula)
     float brightness = 0.299f * col.r + 0.587f * col.g + 0.114f * col.b;
-    bool bit_value = (alpha > 0.5f) && (brightness > 10); // threshold brightness
+    bool bit_value = (alpha > 0.5f) && (brightness > 10);
 
     if (current_draw_mode == DRAW_MODE_PREVIEW) {
-        // For preview mode, only store white/black in preview buffer
-        // Don't mirror - just capture the left side (single 64x32 image)
         int bit_index = orig_y * BIT_WIDTH + x;
         if (bit_index >= 0 && bit_index < BIT_WIDTH * BIT_HEIGHT) {
             preview_buffer[bit_index] = bit_value ? 1 : 0;
         }
-        return; // Don't draw to display in preview mode
+        return;
     }
 
-    // Normal display drawing
     if (mirror < 2) canvas->SetPixel(x, y, col.r * alpha, col.g * alpha, col.b * alpha);
     if (mirror > 0) canvas->SetPixel(128 - x, y, col.r * alpha, col.g * alpha, col.b * alpha);
 
-    // Update serial bitmap buffer
     int bit_index = orig_y * BIT_WIDTH + x;
     if (mirror > 0) {
         setBit(bit_index, bit_value);
@@ -149,7 +143,7 @@ std::string getPreviewBitmapData() {
 }
 
 
-void drawImage(FrameCanvas *canvas, const Texture &image, const vector<vector<TZColor>> &gradient) {
+void drawImage(FrameCanvas *canvas, const Texture &image, const vector<vector<TZColor> > &gradient) {
     for (size_t y = 0; y < 32; y++) {
         for (size_t x = 0; x < 64; x++) {
             setPixel(canvas, x, y, image.textureMap[y][x], gradient);
@@ -157,9 +151,8 @@ void drawImage(FrameCanvas *canvas, const Texture &image, const vector<vector<TZ
     }
 }
 
-void drawPupil(FrameCanvas *canvas, const vector<vector<TZColor>> &gradient, const Texture &pupilArea,
+void drawPupil(FrameCanvas *canvas, const vector<vector<TZColor> > &gradient, const Texture &pupilArea,
                const Texture &pupilShape, int time, float eyeX, float eyeY, bool mirror = false) {
-
     // Find the bounds of the pupil movement area
     int eyeMinX = std::numeric_limits<int>::max();
     int eyeMaxX = std::numeric_limits<int>::min();
@@ -226,9 +219,8 @@ void drawPupil(FrameCanvas *canvas, const vector<vector<TZColor>> &gradient, con
                 int py = y + offsetY;
 
                 // Check bounds
-                if (py >= 0 && py < pupilArea.textureMap.size() && 
+                if (py >= 0 && py < pupilArea.textureMap.size() &&
                     px >= 0 && px < pupilArea.textureMap[py].size()) {
-                    
                     float alpha = pupilArea.textureMap[py][px];
 
                     int m = 0;
@@ -249,9 +241,8 @@ double smoothOscillation(double time, double frequency, double amplitude) {
     return amplitude * sin(frequency * time);
 }
 
-void pupilHelper(FrameCanvas *canvas, const vector<vector<TZColor>> &gradient, const Texture &pupilArea,
+void pupilHelper(FrameCanvas *canvas, const vector<vector<TZColor> > &gradient, const Texture &pupilArea,
                  const Texture &pupilShape, int time) {
-
     // oscillation from smoothOscillation: -0.5 .. 0.5
     double oscillationX = smoothOscillation(time * 0.1, 0.5, 0.5);
     double oscBase = oscillationX * 1.1; // max oscillation scale
@@ -267,13 +258,13 @@ void pupilHelper(FrameCanvas *canvas, const vector<vector<TZColor>> &gradient, c
 
 
 void drawScreen(FrameCanvas *canvas, const Eye eye,
-                const Face face, const vector<vector<TZColor>> &gradient, int time) {
+                const Face face, const vector<vector<TZColor> > &gradient, int time) {
     canvas->Fill(0, 0, 0);
 
 
-    vector<vector<TZColor>> pupilGradient = gradient;
-    vector<vector<TZColor>> eyeGradient = gradient;
-    vector<vector<TZColor>> faceGradient = gradient;
+    vector<vector<TZColor> > pupilGradient = gradient;
+    vector<vector<TZColor> > eyeGradient = gradient;
+    vector<vector<TZColor> > faceGradient = gradient;
 
     if (eye.hasOverride) eyeGradient = eye.override;
     if (eye.hasPupilOverride) pupilGradient = eye.pupilOverride;
@@ -360,11 +351,11 @@ int main() {
         return 1;
     }
 
-    vector<vector<TZColor>> gradientMap = {
-            {{255, 100, 190}, {200, 20,  141}},
-            {{51,  20,  190}, {255, 105, 200}},
+    vector<vector<TZColor> > gradientMap = {
+        {{255, 100, 190}, {200, 20, 141}},
+        {{51, 20, 190}, {255, 105, 200}},
     };
-    vector<vector<TZColor>> preprocessedGradient = Gradient::preprocessGradient(gradientMap);
+    vector<vector<TZColor> > preprocessedGradient = Gradient::preprocessGradient(gradientMap);
 
     Eyes eyes = Eyes();
     Faces faces = Faces();
@@ -419,28 +410,29 @@ int main() {
             if (n > 0) {
                 buf[n] = '\0';
                 serial_buffer += buf;
-                
+
                 // Process complete lines
                 size_t newline_pos;
                 while ((newline_pos = serial_buffer.find('\n')) != std::string::npos) {
                     std::string line = serial_buffer.substr(0, newline_pos);
                     serial_buffer = serial_buffer.substr(newline_pos + 1);
-                    
+
                     // Remove carriage return if present
                     if (!line.empty() && line.back() == '\r') {
                         line.pop_back();
                     }
-                    
+
                     // Process JSON
                     if (!line.empty() && line[0] == '{') {
                         std::string event = extractJsonString(line, "event");
-                        
+
                         if (event == "request_preview") {
                             std::string face = extractJsonString(line, "face");
                             std::string eyesName = extractJsonString(line, "eyes");
                             int brightness = extractJsonInt(line, "brightness");
-                            
-                            std::cout << "Preview request: face=" << face << ", eyes=" << eyesName << ", brightness=" << brightness << std::endl;
+
+                            std::cout << "Preview request: face=" << face << ", eyes=" << eyesName << ", brightness=" <<
+                                    brightness << std::endl;
 
                             Face previewFace = face.empty() ? faces.GetCurrent() : faces.GetSpecific(face);
                             Eye previewEye = eyesName.empty() ? eyes.GetCurrent() : eyes.GetSpecific(eyesName);
@@ -449,20 +441,20 @@ int main() {
 
                             current_draw_mode = DRAW_MODE_PREVIEW;
 
-                            FrameCanvas* previewCanvas = matrix->CreateFrameCanvas();
+                            FrameCanvas *previewCanvas = matrix->CreateFrameCanvas();
                             drawScreen(previewCanvas, previewEye, previewFace, preprocessedGradient, time);
 
                             current_draw_mode = DRAW_MODE_DISPLAY;
 
                             std::string preview_bitmap = getPreviewBitmapData();
-                            std::string message = "{\"event\":\"preview_ready\",\"data\":\"" + base64_encode(packBitmap(preview_bitmap)) + "\"}\n";
+                            std::string message = "{\"event\":\"preview_ready\",\"data\":\"" + base64_encode(
+                                                      packBitmap(preview_bitmap)) + "\"}\n";
                             send_in_chunks(serial_fd, message);
-                            
                         } else if (event == "apply_controls") {
                             std::string face = extractJsonString(line, "face");
                             std::string eyesName = extractJsonString(line, "eyes");
                             int brightness = extractJsonInt(line, "brightness");
-                            
+
                             if (!face.empty()) {
                                 if (faces.SetCurrent(face)) {
                                     std::cout << "Face applied: " << face << std::endl;
@@ -470,7 +462,7 @@ int main() {
                                     std::cout << "Unknown face: " << face << std::endl;
                                 }
                             }
-                            
+
                             if (!eyesName.empty()) {
                                 if (eyes.SetCurrent(eyesName)) {
                                     std::cout << "Eyes applied: " << eyesName << std::endl;
@@ -478,18 +470,17 @@ int main() {
                                     std::cout << "Unknown eyes: " << eyesName << std::endl;
                                 }
                             }
-                            
+
                             if (brightness >= 0 && brightness <= 100) {
                                 currentBrightness = brightness;
                                 matrix->SetBrightness(brightness);
                                 std::cout << "Brightness applied: " << brightness << std::endl;
                             }
-                            
                         } else if (event == "options") {
                             std::string face = extractJsonString(line, "face");
                             std::string eyesName = extractJsonString(line, "eyes");
                             int brightness = extractJsonInt(line, "brightness");
-                            
+
                             if (!face.empty()) {
                                 if (faces.SetCurrent(face)) {
                                     std::cout << "Face set to: " << face << std::endl;
@@ -497,7 +488,7 @@ int main() {
                                     std::cout << "Unknown face: " << face << std::endl;
                                 }
                             }
-                            
+
                             if (!eyesName.empty()) {
                                 if (eyes.SetCurrent(eyesName)) {
                                     std::cout << "Eyes set to: " << eyesName << std::endl;
@@ -505,7 +496,7 @@ int main() {
                                     std::cout << "Unknown eyes: " << eyesName << std::endl;
                                 }
                             }
-                            
+
                             if (brightness >= 0 && brightness <= 100) {
                                 currentBrightness = brightness;
                                 matrix->SetBrightness(brightness);
@@ -539,7 +530,8 @@ int main() {
         auto currentTime = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsedTime = currentTime - lastTime;
 
-        if (elapsedTime.count() >= 1.0) {  // If 1 second has passed
+        if (elapsedTime.count() >= 1.0) {
+            // If 1 second has passed
             fps = frameCount / elapsedTime.count();
             std::cout << "FPS: " << fps << std::endl;
 
@@ -558,8 +550,6 @@ int main() {
 
             send_in_chunks(serial_fd, message);
         }
-
-
     }
 
     // Clean up

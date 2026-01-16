@@ -43,6 +43,6 @@ Face Faces::GetSpecific(const std::string& name) {
     if (faces.find(name) != faces.end()) {
         return faces.at(name);
     }
-    // Return current if not found
+
     return faces.at(currentFace);
 }

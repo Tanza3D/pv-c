@@ -24,26 +24,23 @@ void Texture::loadTexture(const std::string& filePath, std::vector<std::vector<d
                 
                 switch (channel) {
                     case ColorChannel::ALPHA:
-                        // For Face textures - just use alpha directly
+                        // faces
                         value = static_cast<double>(a) / 255.0;
                         break;
                         
                     case ColorChannel::RED:
-                        // For Eye textures - check if red channel is active, then use alpha for anti-aliasing
                         if (r == 255) {
                             value = static_cast<double>(a) / 255.0;
                         }
                         break;
                         
                     case ColorChannel::GREEN:
-                        // For Eye textures - check if green channel is active, then use alpha for anti-aliasing
                         if (g == 255) {
                             value = static_cast<double>(a) / 255.0;
                         }
                         break;
                         
                     case ColorChannel::BLUE:
-                        // For Eye textures - check if blue channel is active, then use alpha for anti-aliasing
                         if (b == 255) {
                             value = static_cast<double>(a) / 255.0;
                         }
