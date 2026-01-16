@@ -50,3 +50,4 @@ hsperfdata_*/
 
 # System files
 Thumbs.db
+.cmake
