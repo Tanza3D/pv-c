@@ -3,8 +3,11 @@
 #include <thread>
 #include <chrono>
 #include "gradient.h"
+#if DESKTOP
+#include "matrix_emu/led-matrix.h"
+#else
 #include "matrix/led-matrix.h"
-#include "matrix/graphics.h"
+#endif
 #include "Texture.h"
 #include "Eye.h"
 #include "Eyes.h"
@@ -69,9 +72,19 @@ void printBitmapData(const std::string &bitmap_data, int width, int height) {
 using namespace rgb_matrix;
 using namespace std;
 
+// Draw modes for setPixel function
+enum DrawMode {
+    DRAW_MODE_DISPLAY,   // Normal display output
+    DRAW_MODE_PREVIEW,   // Preview for controls screen (white/black only)
+    DRAW_MODE_SERIAL     // Serial bitmap output (existing functionality)
+};
+
+DrawMode current_draw_mode = DRAW_MODE_DISPLAY;
+
 #define BIT_WIDTH 64
 #define BIT_HEIGHT 32
 uint8_t bit_buffer[BIT_WIDTH * BIT_HEIGHT / 8] = {0};
+uint8_t preview_buffer[BIT_WIDTH * BIT_HEIGHT] = {0}; // Preview buffer for controls screen (1 bit per pixel)
 
 
 void setBit(int i, bool value) {
@@ -92,15 +105,26 @@ void setPixel(FrameCanvas *canvas, int x, int y, float alpha, const vector<vecto
     y = 32 - y;
     TZColor col = gradient[y][x];
 
+    // Calculate brightness (simple luminance formula)
+    float brightness = 0.299f * col.r + 0.587f * col.g + 0.114f * col.b;
+    bool bit_value = (alpha > 0.5f) && (brightness > 10); // threshold brightness
+
+    if (current_draw_mode == DRAW_MODE_PREVIEW) {
+        // For preview mode, only store white/black in preview buffer
+        // Don't mirror - just capture the left side (single 64x32 image)
+        int bit_index = orig_y * BIT_WIDTH + x;
+        if (bit_index >= 0 && bit_index < BIT_WIDTH * BIT_HEIGHT) {
+            preview_buffer[bit_index] = bit_value ? 1 : 0;
+        }
+        return; // Don't draw to display in preview mode
+    }
+
+    // Normal display drawing
     if (mirror < 2) canvas->SetPixel(x, y, col.r * alpha, col.g * alpha, col.b * alpha);
     if (mirror > 0) canvas->SetPixel(128 - x, y, col.r * alpha, col.g * alpha, col.b * alpha);
 
+    // Update serial bitmap buffer
     int bit_index = orig_y * BIT_WIDTH + x;
-
-    // calculate brightness (simple luminance formula)
-    float brightness = 0.299f * col.r + 0.587f * col.g + 0.114f * col.b;
-    bool bit_value = (alpha > 0.5f) && (brightness > 10); // threshold brightness (10 is example)
-
     if (mirror > 0) {
         setBit(bit_index, bit_value);
     }
@@ -111,6 +135,15 @@ std::string getBitmapData() {
     result.reserve(BIT_WIDTH * BIT_HEIGHT);
     for (int i = 0; i < BIT_WIDTH * BIT_HEIGHT; i++) {
         result += getBit(i) ? '1' : '0';
+    }
+    return result;
+}
+
+std::string getPreviewBitmapData() {
+    std::string result;
+    result.reserve(BIT_WIDTH * BIT_HEIGHT);
+    for (int i = 0; i < BIT_WIDTH * BIT_HEIGHT; i++) {
+        result += preview_buffer[i] ? '1' : '0';
     }
     return result;
 }
@@ -316,7 +349,7 @@ int main() {
     defaults.chain_length = 2;
     defaults.hardware_mapping = "adafruit-hat";
 
-    RuntimeOptions runtime;
+    RGBMatrix::RuntimeOptions runtime;
     runtime.gpio_slowdown = 5;
     defaults.brightness = 100;
     defaults.limit_refresh_rate_hz = 90;
@@ -402,7 +435,57 @@ int main() {
                     if (!line.empty() && line[0] == '{') {
                         std::string event = extractJsonString(line, "event");
                         
-                        if (event == "options") {
+                        if (event == "request_preview") {
+                            std::string face = extractJsonString(line, "face");
+                            std::string eyesName = extractJsonString(line, "eyes");
+                            int brightness = extractJsonInt(line, "brightness");
+                            
+                            std::cout << "Preview request: face=" << face << ", eyes=" << eyesName << ", brightness=" << brightness << std::endl;
+
+                            Face previewFace = face.empty() ? faces.GetCurrent() : faces.GetSpecific(face);
+                            Eye previewEye = eyesName.empty() ? eyes.GetCurrent() : eyes.GetSpecific(eyesName);
+
+                            memset(preview_buffer, 0, sizeof(preview_buffer));
+
+                            current_draw_mode = DRAW_MODE_PREVIEW;
+
+                            FrameCanvas* previewCanvas = matrix->CreateFrameCanvas();
+                            drawScreen(previewCanvas, previewEye, previewFace, preprocessedGradient, time);
+
+                            current_draw_mode = DRAW_MODE_DISPLAY;
+
+                            std::string preview_bitmap = getPreviewBitmapData();
+                            std::string message = "{\"event\":\"preview_ready\",\"data\":\"" + base64_encode(packBitmap(preview_bitmap)) + "\"}\n";
+                            send_in_chunks(serial_fd, message);
+                            
+                        } else if (event == "apply_controls") {
+                            std::string face = extractJsonString(line, "face");
+                            std::string eyesName = extractJsonString(line, "eyes");
+                            int brightness = extractJsonInt(line, "brightness");
+                            
+                            if (!face.empty()) {
+                                if (faces.SetCurrent(face)) {
+                                    std::cout << "Face applied: " << face << std::endl;
+                                } else {
+                                    std::cout << "Unknown face: " << face << std::endl;
+                                }
+                            }
+                            
+                            if (!eyesName.empty()) {
+                                if (eyes.SetCurrent(eyesName)) {
+                                    std::cout << "Eyes applied: " << eyesName << std::endl;
+                                } else {
+                                    std::cout << "Unknown eyes: " << eyesName << std::endl;
+                                }
+                            }
+                            
+                            if (brightness >= 0 && brightness <= 100) {
+                                currentBrightness = brightness;
+                                matrix->SetBrightness(brightness);
+                                std::cout << "Brightness applied: " << brightness << std::endl;
+                            }
+                            
+                        } else if (event == "options") {
                             std::string face = extractJsonString(line, "face");
                             std::string eyesName = extractJsonString(line, "eyes");
                             int brightness = extractJsonInt(line, "brightness");
@@ -430,7 +513,7 @@ int main() {
                             }
                         } else if (event == "restart") {
                             std::cout << "Restart event received" << std::endl;
-                            // Could add restart logic here if needed
+                            // TODO: restart ENTIRE pi (like, sudo reboot)
                         }
                     }
                 }

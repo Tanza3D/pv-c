@@ -43,3 +43,11 @@ bool Eyes::SetCurrent(const std::string& name) {
     }
     return false;
 }
+
+Eye Eyes::GetSpecific(const std::string& name) {
+    if (eyes.find(name) != eyes.end()) {
+        return eyes.at(name);
+    }
+    // Return current if not found
+    return eyes.at(currentEye);
+}

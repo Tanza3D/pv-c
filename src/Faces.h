@@ -19,6 +19,7 @@ public:
     std::string GetCurrentName();
     std::vector<std::string> getTextureNames();
     bool SetCurrent(const std::string& name);
+    Face GetSpecific(const std::string& name);
 };
 
 #endif
